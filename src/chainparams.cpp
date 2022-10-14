@@ -81,6 +81,7 @@ public:
         consensus.fPowAllowMinDifficultyBlocks = false;
         consensus.fPowNoRetargeting = false;
         consensus.nRuleChangeActivationThreshold = 1815; // 90% of 2016
+        consensus.nHardForkRuleChangeActivationThreshold = 1996; // 99% of 2016
         consensus.nMinerConfirmationWindow = 2016; // nPowTargetTimespan / nPowTargetSpacing
         consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].bit = 28;
         consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nStartTime = Consensus::BIP9Deployment::NEVER_ACTIVE;
@@ -92,6 +93,12 @@ public:
         consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].nStartTime = 1619222400; // April 24th, 2021
         consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].nTimeout = 1628640000; // August 11th, 2021
         consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].min_activation_height = 709632; // Approximately November 12th, 2021
+
+        // Deployment of PlusPlus (BIP++1)
+        consensus.vDeployments[Consensus::DEPLOYMENT_PLUSPLUS].bit = 27;
+        consensus.vDeployments[Consensus::DEPLOYMENT_PLUSPLUS].nStartTime = 1665575400; // October 12th, 2022
+        consensus.vDeployments[Consensus::DEPLOYMENT_PLUSPLUS].nTimeout = Consensus::BIP9Deployment::NO_TIMEOUT;
+        consensus.vDeployments[Consensus::DEPLOYMENT_PLUSPLUS].min_activation_height = 0; // No activation delay
 
         consensus.nMinimumChainWork = uint256S("0x00000000000000000000000000000000000000003404ba0801921119f903495e");
         consensus.defaultAssumeValid = uint256S("0x00000000000000000009c97098b5295f7e5f183ac811fb5d1534040adb93cabd"); // 751565
@@ -201,6 +208,7 @@ public:
         consensus.fPowAllowMinDifficultyBlocks = true;
         consensus.fPowNoRetargeting = false;
         consensus.nRuleChangeActivationThreshold = 1512; // 75% for testchains
+        consensus.nHardForkRuleChangeActivationThreshold = 1996; // 99% of 2016
         consensus.nMinerConfirmationWindow = 2016; // nPowTargetTimespan / nPowTargetSpacing
         consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].bit = 28;
         consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nStartTime = Consensus::BIP9Deployment::NEVER_ACTIVE;
@@ -212,6 +220,12 @@ public:
         consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].nStartTime = 1619222400; // April 24th, 2021
         consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].nTimeout = 1628640000; // August 11th, 2021
         consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].min_activation_height = 0; // No activation delay
+
+        // Deployment of PlusPlus (BIP++1)
+        consensus.vDeployments[Consensus::DEPLOYMENT_PLUSPLUS].bit = 27;
+        consensus.vDeployments[Consensus::DEPLOYMENT_PLUSPLUS].nStartTime = Consensus::BIP9Deployment::ALWAYS_ACTIVE;
+        consensus.vDeployments[Consensus::DEPLOYMENT_PLUSPLUS].nTimeout = Consensus::BIP9Deployment::NO_TIMEOUT;
+        consensus.vDeployments[Consensus::DEPLOYMENT_PLUSPLUS].min_activation_height = 0; // No activation delay
 
         consensus.nMinimumChainWork = uint256S("0x00000000000000000000000000000000000000000000076f6e7cbd0beade5d20");
         consensus.defaultAssumeValid = uint256S("0x0000000000000004877fa2d36316398528de4f347df2f8a96f76613a298ce060"); // 2344474
@@ -337,6 +351,7 @@ public:
         consensus.fPowAllowMinDifficultyBlocks = false;
         consensus.fPowNoRetargeting = false;
         consensus.nRuleChangeActivationThreshold = 1815; // 90% of 2016
+        consensus.nHardForkRuleChangeActivationThreshold = 1996; // 99% of 2016
         consensus.nMinerConfirmationWindow = 2016; // nPowTargetTimespan / nPowTargetSpacing
         consensus.MinBIP9WarningHeight = 0;
         consensus.powLimit = uint256S("00000377ae000000000000000000000000000000000000000000000000000000");
@@ -350,6 +365,12 @@ public:
         consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].nStartTime = Consensus::BIP9Deployment::ALWAYS_ACTIVE;
         consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].nTimeout = Consensus::BIP9Deployment::NO_TIMEOUT;
         consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].min_activation_height = 0; // No activation delay
+
+        // Deployment of PlusPlus (BIP++1)
+        consensus.vDeployments[Consensus::DEPLOYMENT_PLUSPLUS].bit = 27;
+        consensus.vDeployments[Consensus::DEPLOYMENT_PLUSPLUS].nStartTime = Consensus::BIP9Deployment::ALWAYS_ACTIVE;
+        consensus.vDeployments[Consensus::DEPLOYMENT_PLUSPLUS].nTimeout = Consensus::BIP9Deployment::NO_TIMEOUT;
+        consensus.vDeployments[Consensus::DEPLOYMENT_PLUSPLUS].min_activation_height = 0; // No activation delay
 
         // message start is defined as the first 4 bytes of the sha256d of the block script
         HashWriter h{};
@@ -406,6 +427,7 @@ public:
         consensus.fPowAllowMinDifficultyBlocks = true;
         consensus.fPowNoRetargeting = true;
         consensus.nRuleChangeActivationThreshold = 108; // 75% for testchains
+        consensus.nHardForkRuleChangeActivationThreshold = 1996; // 99% of 2016
         consensus.nMinerConfirmationWindow = 144; // Faster than normal for regtest (144 instead of 2016)
 
         consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].bit = 28;
@@ -417,6 +439,12 @@ public:
         consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].nStartTime = Consensus::BIP9Deployment::ALWAYS_ACTIVE;
         consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].nTimeout = Consensus::BIP9Deployment::NO_TIMEOUT;
         consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].min_activation_height = 0; // No activation delay
+
+        // Deployment of PlusPlus (BIP++1)
+        consensus.vDeployments[Consensus::DEPLOYMENT_PLUSPLUS].bit = 27;
+        consensus.vDeployments[Consensus::DEPLOYMENT_PLUSPLUS].nStartTime = Consensus::BIP9Deployment::ALWAYS_ACTIVE;
+        consensus.vDeployments[Consensus::DEPLOYMENT_PLUSPLUS].nTimeout = Consensus::BIP9Deployment::NO_TIMEOUT;
+        consensus.vDeployments[Consensus::DEPLOYMENT_PLUSPLUS].min_activation_height = 0; // No activation delay
 
         consensus.nMinimumChainWork = uint256{};
         consensus.defaultAssumeValid = uint256{};

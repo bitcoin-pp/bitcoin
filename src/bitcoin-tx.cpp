@@ -260,9 +260,8 @@ static void MutateTxAddInput(CMutableTransaction& tx, const std::string& strInpu
     if (!ParseHashStr(vStrInputParts[0], txid)) {
         throw std::runtime_error("invalid TX input txid");
     }
-
     static const unsigned int minTxOutSz = 9;
-    static const unsigned int maxVout = MAX_BLOCK_WEIGHT / (WITNESS_SCALE_FACTOR * minTxOutSz);
+    static const unsigned int maxVout = MAX_BLOCK_WEIGHT_LEGACY / (WITNESS_SCALE_FACTOR * minTxOutSz);
 
     // extract and validate vout
     const std::string& strVout = vStrInputParts[1];

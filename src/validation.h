@@ -325,7 +325,7 @@ public:
 /** Functions for validating blocks and updating the block tree */
 
 /** Context-independent validity checks */
-bool CheckBlock(const CBlock& block, BlockValidationState& state, const Consensus::Params& consensusParams, bool fCheckPOW = true, bool fCheckMerkleRoot = true);
+bool CheckBlock(const CBlock& block, BlockValidationState& state, const Consensus::Params& consensusParams, bool fPlusPlusActivated, bool fCheckPOW, bool fCheckMerkleRoot);
 
 /** Check a block is completely valid from start to finish (only works on top of our current best block) */
 bool TestBlockValidity(BlockValidationState& state,
@@ -334,6 +334,7 @@ bool TestBlockValidity(BlockValidationState& state,
                        const CBlock& block,
                        CBlockIndex* pindexPrev,
                        const std::function<NodeClock::time_point()>& adjusted_time_callback,
+                       bool fPlusPlusActivated,
                        bool fCheckPOW = true,
                        bool fCheckMerkleRoot = true) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
 
@@ -653,13 +654,13 @@ public:
         EXCLUSIVE_LOCKS_REQUIRED(!m_chainstate_mutex)
         LOCKS_EXCLUDED(::cs_main);
 
-    bool AcceptBlock(const std::shared_ptr<const CBlock>& pblock, BlockValidationState& state, CBlockIndex** ppindex, bool fRequested, const FlatFilePos* dbp, bool* fNewBlock, bool min_pow_checked) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
+    bool AcceptBlock(const std::shared_ptr<const CBlock>& pblock, BlockValidationState& state, CBlockIndex** ppindex, bool fRequested, const FlatFilePos* dbp, bool* fNewBlock, bool min_pow_checked, const bool* fPlusPlusActivatedOp) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
 
     // Block (dis)connection on a given view:
     DisconnectResult DisconnectBlock(const CBlock& block, const CBlockIndex* pindex, CCoinsViewCache& view)
         EXCLUSIVE_LOCKS_REQUIRED(::cs_main);
     bool ConnectBlock(const CBlock& block, BlockValidationState& state, CBlockIndex* pindex,
-                      CCoinsViewCache& view, bool fJustCheck = false) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
+                      CCoinsViewCache& view, bool fPlusPlusActivated, bool fJustCheck = false) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
 
     // Apply the effects of a block disconnection on the UTXO set.
     bool DisconnectTip(BlockValidationState& state, DisconnectedBlockTransactions* disconnectpool) EXCLUSIVE_LOCKS_REQUIRED(cs_main, m_mempool->cs);

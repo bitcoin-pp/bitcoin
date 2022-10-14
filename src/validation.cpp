@@ -1909,6 +1909,7 @@ public:
     int64_t EndTime(const Consensus::Params& params) const override { return std::numeric_limits<int64_t>::max(); }
     int Period(const Consensus::Params& params) const override { return params.nMinerConfirmationWindow; }
     int Threshold(const Consensus::Params& params) const override { return params.nRuleChangeActivationThreshold; }
+    int HardForkThreshold(const Consensus::Params& params) const override { return params.nRuleChangeActivationThreshold; /*Start warning as if a soft-fork is being activated, before the hard-fork occurs.*/ }
 
     bool Condition(const CBlockIndex* pindex, const Consensus::Params& params) const override
     {
@@ -1976,7 +1977,7 @@ static int64_t num_blocks_total = 0;
  *  Validity checks that depend on the UTXO set are also done; ConnectBlock()
  *  can fail if those validity checks fail (among other reasons). */
 bool Chainstate::ConnectBlock(const CBlock& block, BlockValidationState& state, CBlockIndex* pindex,
-                               CCoinsViewCache& view, bool fJustCheck)
+                              CCoinsViewCache& view, bool fPlusPlusActivated, bool fJustCheck)
 {
     AssertLockHeld(cs_main);
     assert(pindex);
@@ -1999,7 +2000,8 @@ bool Chainstate::ConnectBlock(const CBlock& block, BlockValidationState& state, 
     // is enforced in ContextualCheckBlockHeader(); we wouldn't want to
     // re-enforce that rule here (at least until we make it impossible for
     // m_adjusted_time_callback() to go backward).
-    if (!CheckBlock(block, state, m_params.GetConsensus(), !fJustCheck, !fJustCheck)) {
+
+    if (!CheckBlock(block, state, m_params.GetConsensus(), fPlusPlusActivated, !fJustCheck, !fJustCheck)) {
         if (state.GetResult() == BlockValidationResult::BLOCK_MUTATED) {
             // We don't write down blocks to disk if they may have been
             // corrupted, so this should be impossible unless we're having hardware
@@ -2220,7 +2222,7 @@ bool Chainstate::ConnectBlock(const CBlock& block, BlockValidationState& state, 
         // * p2sh (when P2SH enabled in flags and excludes coinbase)
         // * witness (when witness enabled in flags and excludes coinbase)
         nSigOpsCost += GetTransactionSigOpCost(tx, view, flags);
-        if (nSigOpsCost > MAX_BLOCK_SIGOPS_COST) {
+        if (nSigOpsCost > (fPlusPlusActivated ? MAX_BLOCK_SIGOPS_COST : MAX_BLOCK_SIGOPS_COST_LEGACY)) {
             LogPrintf("ERROR: ConnectBlock(): too many sigops\n");
             return state.Invalid(BlockValidationResult::BLOCK_CONSENSUS, "bad-blk-sigops");
         }
@@ -2575,9 +2577,13 @@ void Chainstate::UpdateTip(const CBlockIndex* pindexNew)
         const CBlockIndex* pindex = pindexNew;
         for (int bit = 0; bit < VERSIONBITS_NUM_BITS; bit++) {
             WarningBitsConditionChecker checker(m_chainman, bit);
-            ThresholdState state = checker.GetStateFor(pindex, m_params.GetConsensus(), warningcache.at(bit));
+            ThresholdState state = checker.GetStateFor(pindex, m_params.GetConsensus(), warningcache.at(bit), bit == VERSIONBITS_HARDFORK_BIT);
             if (state == ThresholdState::ACTIVE || state == ThresholdState::LOCKED_IN) {
-                const bilingual_str warning = strprintf(_("Unknown new rules activated (versionbit %i)"), bit);
+                const bilingual_str warning = strprintf(_(bit == VERSIONBITS_HARDFORK_BIT ?
+                    (state == ThresholdState::ALMOST_LOCKED_IN ?
+                        "Unknown new hard-fork rules may be activated soon. Please upgrade." :
+                        "Unknown new hard-fork rules activated. Please upgrade; it's possible you may never sync to tip.")
+                    : "Unknown new rules activated (versionbit %i)"), bit);
                 if (state == ThresholdState::ACTIVE) {
                     DoWarning(warning);
                 } else {
@@ -2746,7 +2752,7 @@ bool Chainstate::ConnectTip(BlockValidationState& state, CBlockIndex* pindexNew,
              Ticks<MillisecondsDouble>(time_read_from_disk_total) / num_blocks_total);
     {
         CCoinsViewCache view(&CoinsTip());
-        bool rv = ConnectBlock(blockConnecting, state, pindexNew, view);
+        bool rv = ConnectBlock(blockConnecting, state, pindexNew, view, DeploymentActiveAt(*pindexNew, m_chainman, Consensus::DEPLOYMENT_PLUSPLUS));
         GetMainSignals().BlockChecked(blockConnecting, state);
         if (!rv) {
             if (state.IsInvalid())
@@ -3368,9 +3374,9 @@ static bool CheckBlockHeader(const CBlockHeader& block, BlockValidationState& st
     return true;
 }
 
-bool CheckBlock(const CBlock& block, BlockValidationState& state, const Consensus::Params& consensusParams, bool fCheckPOW, bool fCheckMerkleRoot)
+bool CheckBlock(const CBlock& block, BlockValidationState& state, const Consensus::Params& consensusParams, bool fPlusPlusActivated, bool fCheckPOW, bool fCheckMerkleRoot)
 {
-    // These are checks that are independent of context.
+    // These are checks that are independent of context (less BIP++ 001 activation).
 
     if (block.fChecked)
         return true;
@@ -3406,7 +3412,8 @@ bool CheckBlock(const CBlock& block, BlockValidationState& state, const Consensu
     // checks that use witness data may be performed here.
 
     // Size limits
-    if (block.vtx.empty() || block.vtx.size() * WITNESS_SCALE_FACTOR > MAX_BLOCK_WEIGHT || ::GetSerializeSize(block, PROTOCOL_VERSION | SERIALIZE_TRANSACTION_NO_WITNESS) * WITNESS_SCALE_FACTOR > MAX_BLOCK_WEIGHT)
+    const unsigned int maxWeight = fPlusPlusActivated ? MAX_BLOCK_WEIGHT : MAX_BLOCK_WEIGHT_LEGACY;
+    if (block.vtx.empty() || block.vtx.size() * WITNESS_SCALE_FACTOR > maxWeight || ::GetSerializeSize(block, PROTOCOL_VERSION | SERIALIZE_TRANSACTION_NO_WITNESS) * WITNESS_SCALE_FACTOR > maxWeight)
         return state.Invalid(BlockValidationResult::BLOCK_CONSENSUS, "bad-blk-length", "size limits failed");
 
     // First transaction must be coinbase, the rest must not be
@@ -3433,7 +3440,7 @@ bool CheckBlock(const CBlock& block, BlockValidationState& state, const Consensu
     {
         nSigOps += GetLegacySigOpCount(*tx);
     }
-    if (nSigOps * WITNESS_SCALE_FACTOR > MAX_BLOCK_SIGOPS_COST)
+    if (nSigOps * WITNESS_SCALE_FACTOR > (fPlusPlusActivated ? MAX_BLOCK_SIGOPS_COST : MAX_BLOCK_SIGOPS_COST_LEGACY))
         return state.Invalid(BlockValidationResult::BLOCK_CONSENSUS, "bad-blk-sigops", "out-of-bounds SigOpCount");
 
     if (fCheckPOW && fCheckMerkleRoot)
@@ -3555,7 +3562,7 @@ static bool ContextualCheckBlockHeader(const CBlockHeader& block, BlockValidatio
  *  in ConnectBlock().
  *  Note that -reindex-chainstate skips the validation that happens here!
  */
-static bool ContextualCheckBlock(const CBlock& block, BlockValidationState& state, const ChainstateManager& chainman, const CBlockIndex* pindexPrev)
+static bool ContextualCheckBlock(const CBlock& block, BlockValidationState& state, const ChainstateManager& chainman, const CBlockIndex* pindexPrev, bool fPlusPlusActivated)
 {
     const int nHeight = pindexPrev == nullptr ? 0 : pindexPrev->nHeight + 1;
 
@@ -3630,7 +3637,7 @@ static bool ContextualCheckBlock(const CBlock& block, BlockValidationState& stat
     // large by filling up the coinbase witness, which doesn't change
     // the block hash, so we couldn't mark the block as permanently
     // failed).
-    if (GetBlockWeight(block) > MAX_BLOCK_WEIGHT) {
+    if (GetBlockWeight(block) > (fPlusPlusActivated ? MAX_BLOCK_WEIGHT : MAX_BLOCK_WEIGHT_LEGACY)) {
         return state.Invalid(BlockValidationResult::BLOCK_CONSENSUS, "bad-blk-weight", strprintf("%s : weight limit failed", __func__));
     }
 
@@ -3786,7 +3793,7 @@ void ChainstateManager::ReportHeadersPresync(const arith_uint256& work, int64_t 
 }
 
 /** Store block on disk. If dbp is non-nullptr, the file is known to already reside on disk */
-bool Chainstate::AcceptBlock(const std::shared_ptr<const CBlock>& pblock, BlockValidationState& state, CBlockIndex** ppindex, bool fRequested, const FlatFilePos* dbp, bool* fNewBlock, bool min_pow_checked)
+bool Chainstate::AcceptBlock(const std::shared_ptr<const CBlock>& pblock, BlockValidationState& state, CBlockIndex** ppindex, bool fRequested, const FlatFilePos* dbp, bool* fNewBlock, bool min_pow_checked, const bool* fPlusPlusActivatedOp)
 {
     const CBlock& block = *pblock;
 
@@ -3835,8 +3842,15 @@ bool Chainstate::AcceptBlock(const std::shared_ptr<const CBlock>& pblock, BlockV
         if (pindex->nChainWork < nMinimumChainWork) return true;
     }
 
-    if (!CheckBlock(block, state, m_params.GetConsensus()) ||
-        !ContextualCheckBlock(block, state, m_chainman, pindex->pprev)) {
+    bool fPlusPlusActivated;
+    if (fPlusPlusActivatedOp == nullptr) {
+        fPlusPlusActivated = DeploymentActiveAt(*pindex, m_chainman, Consensus::DEPLOYMENT_PLUSPLUS);
+    } else {
+        fPlusPlusActivated = *fPlusPlusActivatedOp;
+    }
+
+    if (!CheckBlock(block, state, m_params.GetConsensus(), fPlusPlusActivated, true, true) ||
+        !ContextualCheckBlock(block, state, m_chainman, pindex->pprev, fPlusPlusActivated)) {
         if (state.IsInvalid() && state.GetResult() != BlockValidationResult::BLOCK_MUTATED) {
             pindex->nStatus |= BLOCK_FAILED_VALID;
             m_blockman.m_dirty_blockindex.insert(pindex);
@@ -3887,10 +3901,11 @@ bool ChainstateManager::ProcessNewBlock(const std::shared_ptr<const CBlock>& blo
         // malleability that cause CheckBlock() to fail; see e.g. CVE-2012-2459 and
         // https://lists.linuxfoundation.org/pipermail/bitcoin-dev/2019-February/016697.html.  Because CheckBlock() is
         // not very expensive, the anti-DoS benefits of caching failure (of a definitely-invalid block) are not substantial.
-        bool ret = CheckBlock(*block, state, GetConsensus());
+        bool fPlusPlusActivated = DeploymentActiveAfter(m_active_chainstate->m_chain.Tip(), m_active_chainstate->m_chainman, Consensus::DEPLOYMENT_PLUSPLUS);
+        bool ret = CheckBlock(*block, state, GetConsensus(), fPlusPlusActivated, true, true);
         if (ret) {
             // Store to disk
-            ret = ActiveChainstate().AcceptBlock(block, state, &pindex, force_processing, nullptr, new_block, min_pow_checked);
+            ret = ActiveChainstate().AcceptBlock(block, state, &pindex, force_processing, nullptr, new_block, min_pow_checked, &fPlusPlusActivated);
         }
         if (!ret) {
             GetMainSignals().BlockChecked(*block, state);
@@ -3928,6 +3943,7 @@ bool TestBlockValidity(BlockValidationState& state,
                        const CBlock& block,
                        CBlockIndex* pindexPrev,
                        const std::function<NodeClock::time_point()>& adjusted_time_callback,
+                       bool fPlusPlusActivated,
                        bool fCheckPOW,
                        bool fCheckMerkleRoot)
 {
@@ -3943,9 +3959,9 @@ bool TestBlockValidity(BlockValidationState& state,
     // NOTE: CheckBlockHeader is called by CheckBlock
     if (!ContextualCheckBlockHeader(block, state, chainstate.m_blockman, chainstate.m_chainman, pindexPrev, adjusted_time_callback()))
         return error("%s: Consensus::ContextualCheckBlockHeader: %s", __func__, state.ToString());
-    if (!CheckBlock(block, state, chainparams.GetConsensus(), fCheckPOW, fCheckMerkleRoot))
+    if (!CheckBlock(block, state, chainparams.GetConsensus(), fPlusPlusActivated, fCheckPOW, fCheckMerkleRoot))
         return error("%s: Consensus::CheckBlock: %s", __func__, state.ToString());
-    if (!ContextualCheckBlock(block, state, chainstate.m_chainman, pindexPrev))
+    if (!ContextualCheckBlock(block, state, chainstate.m_chainman, pindexPrev, fPlusPlusActivated))
         return error("%s: Consensus::ContextualCheckBlock: %s", __func__, state.ToString());
     if (!chainstate.ConnectBlock(block, state, &indexDummy, viewNew, true)) {
         return false;
@@ -4061,7 +4077,8 @@ bool CVerifyDB::VerifyDB(
             return error("VerifyDB(): *** ReadBlockFromDisk failed at %d, hash=%s", pindex->nHeight, pindex->GetBlockHash().ToString());
         }
         // check level 1: verify block validity
-        if (nCheckLevel >= 1 && !CheckBlock(block, state, consensus_params)) {
+        bool fPlusPlusActivated = DeploymentActiveAt(*pindex, chainstate.m_chainman, Consensus::DEPLOYMENT_PLUSPLUS);
+        if (nCheckLevel >= 1 && !CheckBlock(block, state, consensus_params, fPlusPlusActivated, true, true)) {
             return error("%s: *** found bad block at %d, hash=%s (%s)\n", __func__,
                          pindex->nHeight, pindex->GetBlockHash().ToString(), state.ToString());
         }
@@ -4113,7 +4130,8 @@ bool CVerifyDB::VerifyDB(
             CBlock block;
             if (!ReadBlockFromDisk(block, pindex, consensus_params))
                 return error("VerifyDB(): *** ReadBlockFromDisk failed at %d, hash=%s", pindex->nHeight, pindex->GetBlockHash().ToString());
-            if (!chainstate.ConnectBlock(block, state, pindex, coins)) {
+            bool fPlusPlusActivated = DeploymentActiveAt(*pindex, chainstate.m_chainman, Consensus::DEPLOYMENT_PLUSPLUS);
+            if (!chainstate.ConnectBlock(block, state, pindex, coins, fPlusPlusActivated)) {
                 return error("VerifyDB(): *** found unconnectable block at %d, hash=%s (%s)", pindex->nHeight, pindex->GetBlockHash().ToString(), state.ToString());
             }
             if (ShutdownRequested()) return true;
@@ -4373,7 +4391,7 @@ void Chainstate::LoadExternalBlockFile(
     int nLoaded = 0;
     try {
         // This takes over fileIn and calls fclose() on it in the CBufferedFile destructor
-        CBufferedFile blkdat(fileIn, 2*MAX_BLOCK_SERIALIZED_SIZE, MAX_BLOCK_SERIALIZED_SIZE+8, SER_DISK, CLIENT_VERSION);
+        CBufferedFile blkdat(fileIn, 2 * MAX_BLOCK_SERIALIZED_SIZE, MAX_BLOCK_SERIALIZED_SIZE + 8, SER_DISK, CLIENT_VERSION);
         uint64_t nRewind = blkdat.GetPos();
         while (!blkdat.eof()) {
             if (ShutdownRequested()) return;
@@ -4427,7 +4445,8 @@ void Chainstate::LoadExternalBlockFile(
                     const CBlockIndex* pindex = m_blockman.LookupBlockIndex(hash);
                     if (!pindex || (pindex->nStatus & BLOCK_HAVE_DATA) == 0) {
                       BlockValidationState state;
-                      if (AcceptBlock(pblock, state, nullptr, true, dbp, nullptr, true)) {
+                      bool fPlusPlusActivated = DeploymentActiveAt(*pindex, m_chainman, Consensus::DEPLOYMENT_PLUSPLUS);
+                      if (AcceptBlock(pblock, state, nullptr, true, dbp, nullptr, true, &fPlusPlusActivated)) {
                           nLoaded++;
                       }
                       if (state.IsError()) {
@@ -4465,7 +4484,7 @@ void Chainstate::LoadExternalBlockFile(
                                     head.ToString());
                             LOCK(cs_main);
                             BlockValidationState dummy;
-                            if (AcceptBlock(pblockrecursive, dummy, nullptr, true, &it->second, nullptr, true)) {
+                            if (AcceptBlock(pblockrecursive, dummy, nullptr, true, &it->second, nullptr, true, nullptr)) {
                                 nLoaded++;
                                 queue.push_back(pblockrecursive->GetHash());
                             }

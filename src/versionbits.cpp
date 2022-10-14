@@ -6,10 +6,11 @@
 #include <util/check.h>
 #include <versionbits.h>
 
-ThresholdState AbstractThresholdConditionChecker::GetStateFor(const CBlockIndex* pindexPrev, const Consensus::Params& params, ThresholdConditionCache& cache) const
+ThresholdState AbstractThresholdConditionChecker::GetStateFor(const CBlockIndex* pindexPrev, const Consensus::Params& params, ThresholdConditionCache& cache, bool hardForkBit) const
 {
     int nPeriod = Period(params);
-    int nThreshold = Threshold(params);
+    int nThreshold = hardForkBit ? HardForkThreshold(params) : Threshold(params);
+    int warnThreshold = Threshold(params);
     int min_activation_height = MinActivationHeight(params);
     int64_t nTimeStart = BeginTime(params);
     int64_t nTimeTimeout = EndTime(params);
@@ -63,7 +64,9 @@ ThresholdState AbstractThresholdConditionChecker::GetStateFor(const CBlockIndex*
                 }
                 break;
             }
-            case ThresholdState::STARTED: {
+            case ThresholdState::STARTED:
+            case ThresholdState::ALMOST_LOCKED_IN:
+            {
                 // We need to count
                 const CBlockIndex* pindexCount = pindexPrev;
                 int count = 0;
@@ -75,7 +78,11 @@ ThresholdState AbstractThresholdConditionChecker::GetStateFor(const CBlockIndex*
                 }
                 if (count >= nThreshold) {
                     stateNext = ThresholdState::LOCKED_IN;
-                } else if (pindexPrev->GetMedianTimePast() >= nTimeTimeout) {
+                } else if (count > warnThreshold && warnThreshold < nThreshold && hardForkBit) {
+                    // Unknown hard-fork warning versionbit
+                    stateNext = ThresholdState::ALMOST_LOCKED_IN;
+                }
+                else if (pindexPrev->GetMedianTimePast() >= nTimeTimeout) {
                     stateNext = ThresholdState::FAILED;
                 }
                 break;
@@ -99,12 +106,12 @@ ThresholdState AbstractThresholdConditionChecker::GetStateFor(const CBlockIndex*
     return state;
 }
 
-BIP9Stats AbstractThresholdConditionChecker::GetStateStatisticsFor(const CBlockIndex* pindex, const Consensus::Params& params, std::vector<bool>* signalling_blocks) const
+BIP9Stats AbstractThresholdConditionChecker::GetStateStatisticsFor(const CBlockIndex* pindex, const Consensus::Params& params, std::vector<bool>* signalling_blocks, bool hardForkBit) const
 {
     BIP9Stats stats = {};
 
     stats.period = Period(params);
-    stats.threshold = Threshold(params);
+    stats.threshold = hardForkBit ? HardForkThreshold(params) : Threshold(params);
 
     if (pindex == nullptr) return stats;
 
@@ -137,14 +144,14 @@ BIP9Stats AbstractThresholdConditionChecker::GetStateStatisticsFor(const CBlockI
     return stats;
 }
 
-int AbstractThresholdConditionChecker::GetStateSinceHeightFor(const CBlockIndex* pindexPrev, const Consensus::Params& params, ThresholdConditionCache& cache) const
+int AbstractThresholdConditionChecker::GetStateSinceHeightFor(const CBlockIndex* pindexPrev, const Consensus::Params& params, ThresholdConditionCache& cache, bool hardForkBit) const
 {
     int64_t start_time = BeginTime(params);
     if (start_time == Consensus::BIP9Deployment::ALWAYS_ACTIVE || start_time == Consensus::BIP9Deployment::NEVER_ACTIVE) {
         return 0;
     }
 
-    const ThresholdState initialState = GetStateFor(pindexPrev, params, cache);
+    const ThresholdState initialState = GetStateFor(pindexPrev, params, cache, hardForkBit);
 
     // BIP 9 about state DEFINED: "The genesis block is by definition in this state for each deployment."
     if (initialState == ThresholdState::DEFINED) {
@@ -163,7 +170,7 @@ int AbstractThresholdConditionChecker::GetStateSinceHeightFor(const CBlockIndex*
 
     const CBlockIndex* previousPeriodParent = pindexPrev->GetAncestor(pindexPrev->nHeight - nPeriod);
 
-    while (previousPeriodParent != nullptr && GetStateFor(previousPeriodParent, params, cache) == initialState) {
+    while (previousPeriodParent != nullptr && GetStateFor(previousPeriodParent, params, cache, hardForkBit) == initialState) {
         pindexPrev = previousPeriodParent;
         previousPeriodParent = pindexPrev->GetAncestor(pindexPrev->nHeight - nPeriod);
     }
@@ -187,6 +194,7 @@ protected:
     int MinActivationHeight(const Consensus::Params& params) const override { return params.vDeployments[id].min_activation_height; }
     int Period(const Consensus::Params& params) const override { return params.nMinerConfirmationWindow; }
     int Threshold(const Consensus::Params& params) const override { return params.nRuleChangeActivationThreshold; }
+    int HardForkThreshold(const Consensus::Params& params) const override { return params.nHardForkRuleChangeActivationThreshold; }
 
     bool Condition(const CBlockIndex* pindex, const Consensus::Params& params) const override
     {
@@ -203,18 +211,18 @@ public:
 ThresholdState VersionBitsCache::State(const CBlockIndex* pindexPrev, const Consensus::Params& params, Consensus::DeploymentPos pos)
 {
     LOCK(m_mutex);
-    return VersionBitsConditionChecker(pos).GetStateFor(pindexPrev, params, m_caches[pos]);
+    return VersionBitsConditionChecker(pos).GetStateFor(pindexPrev, params, m_caches[pos], pos == Consensus::DEPLOYMENT_ACTIVE_PENDING_HARDFORK);
 }
 
 BIP9Stats VersionBitsCache::Statistics(const CBlockIndex* pindex, const Consensus::Params& params, Consensus::DeploymentPos pos, std::vector<bool>* signalling_blocks)
 {
-    return VersionBitsConditionChecker(pos).GetStateStatisticsFor(pindex, params, signalling_blocks);
+    return VersionBitsConditionChecker(pos).GetStateStatisticsFor(pindex, params, signalling_blocks, pos == Consensus::DEPLOYMENT_ACTIVE_PENDING_HARDFORK);
 }
 
 int VersionBitsCache::StateSinceHeight(const CBlockIndex* pindexPrev, const Consensus::Params& params, Consensus::DeploymentPos pos)
 {
     LOCK(m_mutex);
-    return VersionBitsConditionChecker(pos).GetStateSinceHeightFor(pindexPrev, params, m_caches[pos]);
+    return VersionBitsConditionChecker(pos).GetStateSinceHeightFor(pindexPrev, params, m_caches[pos], pos == Consensus::DEPLOYMENT_ACTIVE_PENDING_HARDFORK);
 }
 
 uint32_t VersionBitsCache::Mask(const Consensus::Params& params, Consensus::DeploymentPos pos)
@@ -229,7 +237,8 @@ int32_t VersionBitsCache::ComputeBlockVersion(const CBlockIndex* pindexPrev, con
 
     for (int i = 0; i < (int)Consensus::MAX_VERSION_BITS_DEPLOYMENTS; i++) {
         Consensus::DeploymentPos pos = static_cast<Consensus::DeploymentPos>(i);
-        ThresholdState state = VersionBitsConditionChecker(pos).GetStateFor(pindexPrev, params, m_caches[pos]);
+        VersionBitsConditionChecker vbcChecker = VersionBitsConditionChecker(pos);
+        ThresholdState state = vbcChecker.GetStateFor(pindexPrev, params, m_caches[pos], pos == Consensus::DEPLOYMENT_ACTIVE_PENDING_HARDFORK);
         if (state == ThresholdState::LOCKED_IN || state == ThresholdState::STARTED) {
             nVersion |= Mask(params, pos);
         }
