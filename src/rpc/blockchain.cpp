@@ -1112,7 +1112,7 @@ static RPCHelpMan verifychain()
     };
 }
 
-static void SoftForkDescPushBack(const CBlockIndex* blockindex, UniValue& softforks, const ChainstateManager& chainman, Consensus::BuriedDeployment dep)
+static void ForkDescPushBack(const CBlockIndex* blockindex, UniValue& softforks, const ChainstateManager& chainman, Consensus::BuriedDeployment dep)
 {
     // For buried deployments.
 
@@ -1127,7 +1127,7 @@ static void SoftForkDescPushBack(const CBlockIndex* blockindex, UniValue& softfo
     softforks.pushKV(DeploymentName(dep), rv);
 }
 
-static void SoftForkDescPushBack(const CBlockIndex* blockindex, UniValue& softforks, const ChainstateManager& chainman, Consensus::DeploymentPos id)
+static void ForkDescPushBack(const CBlockIndex* blockindex, UniValue& softforks, const ChainstateManager& chainman, Consensus::DeploymentPos id)
 {
     // For BIP9 deployments.
 
@@ -1141,6 +1141,7 @@ static void SoftForkDescPushBack(const CBlockIndex* blockindex, UniValue& softfo
         case ThresholdState::LOCKED_IN: return "locked_in";
         case ThresholdState::ACTIVE: return "active";
         case ThresholdState::FAILED: return "failed";
+        case ThresholdState::ALMOST_LOCKED_IN: return "almost_locked_in";
         }
         return "invalid";
     };
@@ -1295,15 +1296,16 @@ const std::vector<RPCResult> RPCHelpForDeployment{
 
 UniValue DeploymentInfo(const CBlockIndex* blockindex, const ChainstateManager& chainman)
 {
-    UniValue softforks(UniValue::VOBJ);
-    SoftForkDescPushBack(blockindex, softforks, chainman, Consensus::DEPLOYMENT_HEIGHTINCB);
-    SoftForkDescPushBack(blockindex, softforks, chainman, Consensus::DEPLOYMENT_DERSIG);
-    SoftForkDescPushBack(blockindex, softforks, chainman, Consensus::DEPLOYMENT_CLTV);
-    SoftForkDescPushBack(blockindex, softforks, chainman, Consensus::DEPLOYMENT_CSV);
-    SoftForkDescPushBack(blockindex, softforks, chainman, Consensus::DEPLOYMENT_SEGWIT);
-    SoftForkDescPushBack(blockindex, softforks, chainman, Consensus::DEPLOYMENT_TESTDUMMY);
-    SoftForkDescPushBack(blockindex, softforks, chainman, Consensus::DEPLOYMENT_TAPROOT);
-    return softforks;
+    UniValue forks(UniValue::VOBJ);
+    ForkDescPushBack(blockindex, forks, chainman, Consensus::DEPLOYMENT_HEIGHTINCB);
+    ForkDescPushBack(blockindex, forks, chainman, Consensus::DEPLOYMENT_DERSIG);
+    ForkDescPushBack(blockindex, forks, chainman, Consensus::DEPLOYMENT_CLTV);
+    ForkDescPushBack(blockindex, forks, chainman, Consensus::DEPLOYMENT_CSV);
+    ForkDescPushBack(blockindex, forks, chainman, Consensus::DEPLOYMENT_SEGWIT);
+    ForkDescPushBack(blockindex, forks, chainman, Consensus::DEPLOYMENT_TESTDUMMY);
+    ForkDescPushBack(blockindex, forks, chainman, Consensus::DEPLOYMENT_TAPROOT);
+    ForkDescPushBack(blockindex, forks, chainman, Consensus::DEPLOYMENT_PLUSPLUS);
+    return forks;
 }
 } // anon namespace
 

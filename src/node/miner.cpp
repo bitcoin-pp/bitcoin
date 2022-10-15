@@ -62,22 +62,23 @@ BlockAssembler::Options::Options()
     nBlockMaxWeight = DEFAULT_BLOCK_MAX_WEIGHT;
 }
 
-BlockAssembler::BlockAssembler(Chainstate& chainstate, const CTxMemPool* mempool, const Options& options)
+BlockAssembler::BlockAssembler(Chainstate& chainstate, const CTxMemPool* mempool, const Options& options, bool fPlusPlusActivated)
     : chainparams{chainstate.m_chainman.GetParams()},
       m_mempool(mempool),
       m_chainstate(chainstate)
 {
     blockMinFeeRate = options.blockMinFeeRate;
     // Limit weight to between 4K and MAX_BLOCK_WEIGHT-4K for sanity:
-    nBlockMaxWeight = std::max<size_t>(4000, std::min<size_t>(MAX_BLOCK_WEIGHT - 4000, options.nBlockMaxWeight));
+    nBlockMaxWeight = std::max<size_t>(4000, std::min<size_t>((fPlusPlusActivated ? MAX_BLOCK_WEIGHT : MAX_BLOCK_WEIGHT_LEGACY) - 4000, options.nBlockMaxWeight));
+    nPlusPlusActivated = fPlusPlusActivated;
 }
 
-static BlockAssembler::Options DefaultOptions()
+static BlockAssembler::Options DefaultOptions(bool fPlusPlusActivated)
 {
     // Block resource limits
     // If -blockmaxweight is not given, limit to DEFAULT_BLOCK_MAX_WEIGHT
-    BlockAssembler::Options options;
-    options.nBlockMaxWeight = gArgs.GetIntArg("-blockmaxweight", DEFAULT_BLOCK_MAX_WEIGHT);
+    BlockAssembler::Options options;                             // Once PlusPlus is activated, default the new max block size to double of legacy. Miners can adjust accordingly afterwards.
+    options.nBlockMaxWeight = gArgs.GetIntArg("-blockmaxweight", fPlusPlusActivated ? DEFAULT_BLOCK_MAX_WEIGHT * 2 : DEFAULT_BLOCK_MAX_WEIGHT);
     if (gArgs.IsArgSet("-blockmintxfee")) {
         std::optional<CAmount> parsed = ParseMoney(gArgs.GetArg("-blockmintxfee", ""));
         options.blockMinFeeRate = CFeeRate{parsed.value_or(DEFAULT_BLOCK_MIN_TX_FEE)};
@@ -87,8 +88,8 @@ static BlockAssembler::Options DefaultOptions()
     return options;
 }
 
-BlockAssembler::BlockAssembler(Chainstate& chainstate, const CTxMemPool* mempool)
-    : BlockAssembler(chainstate, mempool, DefaultOptions()) {}
+BlockAssembler::BlockAssembler(Chainstate& chainstate, const CTxMemPool* mempool, bool fPlusPlusActivated)
+    : BlockAssembler(chainstate, mempool, DefaultOptions(fPlusPlusActivated), fPlusPlusActivated) {}
 
 void BlockAssembler::resetBlock()
 {
@@ -201,7 +202,7 @@ bool BlockAssembler::TestPackage(uint64_t packageSize, int64_t packageSigOpsCost
     if (nBlockWeight + WITNESS_SCALE_FACTOR * packageSize >= nBlockMaxWeight) {
         return false;
     }
-    if (nBlockSigOpsCost + packageSigOpsCost >= MAX_BLOCK_SIGOPS_COST) {
+    if (nBlockSigOpsCost + packageSigOpsCost >= (nPlusPlusActivated ? MAX_BLOCK_SIGOPS_COST : MAX_BLOCK_SIGOPS_COST_LEGACY)) {
         return false;
     }
     return true;

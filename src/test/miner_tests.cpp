@@ -60,7 +60,7 @@ BlockAssembler MinerTestingSetup::AssemblerForTest(CTxMemPool& tx_mempool)
 
     options.nBlockMaxWeight = MAX_BLOCK_WEIGHT;
     options.blockMinFeeRate = blockMinFeeRate;
-    return BlockAssembler{m_node.chainman->ActiveChainstate(), &tx_mempool, options};
+    return BlockAssembler{m_node.chainman->ActiveChainstate(), &tx_mempool, options, true};
 }
 
 constexpr static struct {

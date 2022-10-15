@@ -31,8 +31,10 @@ constexpr bool ValidDeployment(BuriedDeployment dep) { return dep <= DEPLOYMENT_
 enum DeploymentPos : uint16_t {
     DEPLOYMENT_TESTDUMMY,
     DEPLOYMENT_TAPROOT, // Deployment of Schnorr/Taproot (BIPs 340-342)
+    DEPLOYMENT_PLUSPLUS, // Deployment of PlusPlus (BIP++1)
     // NOTE: Also add new deployments to VersionBitsDeploymentInfo in deploymentinfo.cpp
-    MAX_VERSION_BITS_DEPLOYMENTS
+    MAX_VERSION_BITS_DEPLOYMENTS,
+    DEPLOYMENT_ACTIVE_PENDING_HARDFORK = DEPLOYMENT_PLUSPLUS, // Set to MAX_VERSION_BITS_DEPLOYMENTS + 1 if no hard-fork is pending.
 };
 constexpr bool ValidDeployment(DeploymentPos dep) { return dep < MAX_VERSION_BITS_DEPLOYMENTS; }
 
@@ -102,6 +104,7 @@ struct Params {
      * Examples: 1916 for 95%, 1512 for testchains.
      */
     uint32_t nRuleChangeActivationThreshold;
+    uint32_t nHardForkRuleChangeActivationThreshold;
     uint32_t nMinerConfirmationWindow;
     BIP9Deployment vDeployments[MAX_VERSION_BITS_DEPLOYMENTS];
     /** Proof of work parameters */

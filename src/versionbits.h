@@ -18,6 +18,8 @@ static const int32_t VERSIONBITS_TOP_BITS = 0x20000000UL;
 static const int32_t VERSIONBITS_TOP_MASK = 0xE0000000UL;
 /** Total bits available for versionbits */
 static const int32_t VERSIONBITS_NUM_BITS = 29;
+/** Total bits available for versionbits */
+static const int32_t VERSIONBITS_HARDFORK_BIT = 27;
 
 /** BIP 9 defines a finite-state-machine to deploy a softfork in multiple stages.
  *  State transitions happen during retarget period if conditions are met
@@ -30,6 +32,7 @@ enum class ThresholdState {
     LOCKED_IN, // For at least one retarget period after the first retarget period with STARTED blocks of which at least threshold have the associated bit set in nVersion, until min_activation_height is reached.
     ACTIVE,    // For all blocks after the LOCKED_IN retarget period (final state)
     FAILED,    // For all blocks once the first retarget period after the timeout time is hit, if LOCKED_IN wasn't already reached (final state)
+    ALMOST_LOCKED_IN, // Only used for warning about impending hard-fork.
 };
 
 // A map that gives the state for blocks whose height is a multiple of Period().
@@ -61,18 +64,19 @@ protected:
     virtual int64_t EndTime(const Consensus::Params& params) const =0;
     virtual int MinActivationHeight(const Consensus::Params& params) const { return 0; }
     virtual int Period(const Consensus::Params& params) const =0;
-    virtual int Threshold(const Consensus::Params& params) const =0;
+    virtual int Threshold(const Consensus::Params& params) const = 0;
+    virtual int HardForkThreshold(const Consensus::Params& params) const = 0;
 
 public:
     /** Returns the numerical statistics of an in-progress BIP9 softfork in the period including pindex
      * If provided, signalling_blocks is set to true/false based on whether each block in the period signalled
      */
-    BIP9Stats GetStateStatisticsFor(const CBlockIndex* pindex, const Consensus::Params& params, std::vector<bool>* signalling_blocks = nullptr) const;
+    BIP9Stats GetStateStatisticsFor(const CBlockIndex* pindex, const Consensus::Params& params, std::vector<bool>* signalling_blocks, bool hardForkBit) const;
     /** Returns the state for pindex A based on parent pindexPrev B. Applies any state transition if conditions are present.
      *  Caches state from first block of period. */
-    ThresholdState GetStateFor(const CBlockIndex* pindexPrev, const Consensus::Params& params, ThresholdConditionCache& cache) const;
+    ThresholdState GetStateFor(const CBlockIndex* pindexPrev, const Consensus::Params& params, ThresholdConditionCache& cache, bool hardForkBit) const;
     /** Returns the height since when the ThresholdState has started for pindex A based on parent pindexPrev B, all blocks of a period share the same */
-    int GetStateSinceHeightFor(const CBlockIndex* pindexPrev, const Consensus::Params& params, ThresholdConditionCache& cache) const;
+    int GetStateSinceHeightFor(const CBlockIndex* pindexPrev, const Consensus::Params& params, ThresholdConditionCache& cache, bool hardForkBit) const;
 };
 
 /** BIP 9 allows multiple softforks to be deployed in parallel. We cache

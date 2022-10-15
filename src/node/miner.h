@@ -134,6 +134,7 @@ private:
     // Configuration parameters for the block size
     unsigned int nBlockMaxWeight;
     CFeeRate blockMinFeeRate;
+    bool nPlusPlusActivated;
 
     // Information on the current status of the block
     uint64_t nBlockWeight;
@@ -157,8 +158,8 @@ public:
         CFeeRate blockMinFeeRate;
     };
 
-    explicit BlockAssembler(Chainstate& chainstate, const CTxMemPool* mempool);
-    explicit BlockAssembler(Chainstate& chainstate, const CTxMemPool* mempool, const Options& options);
+    explicit BlockAssembler(Chainstate& chainstate, const CTxMemPool* mempool, bool fPlusPlusActivated);
+    explicit BlockAssembler(Chainstate& chainstate, const CTxMemPool* mempool, const Options& options, bool fPlusPlusActivated);
 
     /** Construct a new block template with coinbase to scriptPubKeyIn */
     std::unique_ptr<CBlockTemplate> CreateNewBlock(const CScript& scriptPubKeyIn);

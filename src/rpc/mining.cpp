@@ -144,7 +144,9 @@ static UniValue generateBlocks(ChainstateManager& chainman, const CTxMemPool& me
 {
     UniValue blockHashes(UniValue::VARR);
     while (nGenerate > 0 && !ShutdownRequested()) {
-        std::unique_ptr<CBlockTemplate> pblocktemplate(BlockAssembler{chainman.ActiveChainstate(), &mempool}.CreateNewBlock(coinbase_script));
+        Chainstate& chainstate = chainman.ActiveChainstate();
+        const bool fPlusPlusActivated = DeploymentActiveAfter(chainstate.m_chain.Tip(), chainman, Consensus::DEPLOYMENT_PLUSPLUS);
+        std::unique_ptr<CBlockTemplate> pblocktemplate(BlockAssembler{chainman.ActiveChainstate(), &mempool, fPlusPlusActivated}.CreateNewBlock(coinbase_script));
         if (!pblocktemplate.get())
             throw JSONRPCError(RPC_INTERNAL_ERROR, "Couldn't create new block");
         CBlock *pblock = &pblocktemplate->block;
@@ -354,7 +356,9 @@ static RPCHelpMan generateblock()
     {
         LOCK(cs_main);
 
-        std::unique_ptr<CBlockTemplate> blocktemplate(BlockAssembler{chainman.ActiveChainstate(), nullptr}.CreateNewBlock(coinbase_script));
+        Chainstate& chainstate = chainman.ActiveChainstate();
+        const bool fPlusPlusActivated = DeploymentActiveAfter(chainstate.m_chain.Tip(), chainman, Consensus::DEPLOYMENT_PLUSPLUS);
+        std::unique_ptr<CBlockTemplate> blocktemplate(BlockAssembler{chainstate, nullptr, fPlusPlusActivated}.CreateNewBlock(coinbase_script));
         if (!blocktemplate) {
             throw JSONRPCError(RPC_INTERNAL_ERROR, "Couldn't create new block");
         }
@@ -745,7 +749,8 @@ static RPCHelpMan getblocktemplate()
 
         // Create new block
         CScript scriptDummy = CScript() << OP_TRUE;
-        pblocktemplate = BlockAssembler{active_chainstate, &mempool}.CreateNewBlock(scriptDummy);
+        const bool fPlusPlusActivated = DeploymentActiveAfter(pindexPrevNew, chainman, Consensus::DEPLOYMENT_PLUSPLUS);
+        pblocktemplate = BlockAssembler{active_chainstate, &mempool, fPlusPlusActivated}.CreateNewBlock(scriptDummy);
         if (!pblocktemplate)
             throw JSONRPCError(RPC_OUT_OF_MEMORY, "Out of memory");
 
@@ -761,6 +766,7 @@ static RPCHelpMan getblocktemplate()
 
     // NOTE: If at some point we support pre-segwit miners post-segwit-activation, this needs to take segwit support into consideration
     const bool fPreSegWit = !DeploymentActiveAfter(pindexPrev, chainman, Consensus::DEPLOYMENT_SEGWIT);
+    const bool fPrePlusPlus = !DeploymentActiveAfter(pindexPrev, chainman, Consensus::DEPLOYMENT_PLUSPLUS);
 
     UniValue aCaps(UniValue::VARR); aCaps.push_back("proposal");
 
@@ -817,6 +823,7 @@ static RPCHelpMan getblocktemplate()
     UniValue aRules(UniValue::VARR);
     aRules.push_back("csv");
     if (!fPreSegWit) aRules.push_back("!segwit");
+    if (!fPrePlusPlus) aRules.push_back("!plusplus");
     if (consensusParams.signet_blocks) {
         // indicate to miner that they must understand signet rules
         // when attempting to mine with this template
@@ -877,8 +884,8 @@ static RPCHelpMan getblocktemplate()
     result.pushKV("mintime", (int64_t)pindexPrev->GetMedianTimePast()+1);
     result.pushKV("mutable", aMutable);
     result.pushKV("noncerange", "00000000ffffffff");
-    int64_t nSigOpLimit = MAX_BLOCK_SIGOPS_COST;
-    int64_t nSizeLimit = MAX_BLOCK_SERIALIZED_SIZE;
+    int64_t nSigOpLimit = fPrePlusPlus ? MAX_BLOCK_SIGOPS_COST_LEGACY : MAX_BLOCK_SIGOPS_COST;
+    int64_t nSizeLimit = fPrePlusPlus ? MAX_BLOCK_SERIALIZED_SIZE_LEGACY : MAX_BLOCK_SERIALIZED_SIZE;
     if (fPreSegWit) {
         CHECK_NONFATAL(nSigOpLimit % WITNESS_SCALE_FACTOR == 0);
         nSigOpLimit /= WITNESS_SCALE_FACTOR;
@@ -888,7 +895,7 @@ static RPCHelpMan getblocktemplate()
     result.pushKV("sigoplimit", nSigOpLimit);
     result.pushKV("sizelimit", nSizeLimit);
     if (!fPreSegWit) {
-        result.pushKV("weightlimit", (int64_t)MAX_BLOCK_WEIGHT);
+        result.pushKV("weightlimit", fPrePlusPlus ? (int64_t)MAX_BLOCK_WEIGHT_LEGACY : (int64_t)MAX_BLOCK_WEIGHT);
     }
     result.pushKV("curtime", pblock->GetBlockTime());
     result.pushKV("bits", strprintf("%08x", pblock->nBits));

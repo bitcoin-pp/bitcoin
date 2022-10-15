@@ -130,10 +130,11 @@ BOOST_FIXTURE_TEST_CASE(chainstate_update_tip, TestChain100Setup)
     // once it is changed to support multiple chainstates.
     {
         LOCK(::cs_main);
-        bool checked = CheckBlock(*pblock, state, chainparams.GetConsensus());
+        bool checked = CheckBlock(*pblock, state, chainparams.GetConsensus(), true, true, true);
         BOOST_CHECK(checked);
+        bool fPlusPlusActivated = true;
         bool accepted = background_cs.AcceptBlock(
-            pblock, state, &pindex, true, nullptr, &newblock, true);
+            pblock, state, &pindex, true, nullptr, &newblock, true, &fPlusPlusActivated);
         BOOST_CHECK(accepted);
     }
     // UpdateTip is called here

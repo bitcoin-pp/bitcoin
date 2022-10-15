@@ -1,3 +1,61 @@
+Bitcoin Core++ integration/staging tree
+=====================================
+
+What is Bitcoin Core++?
+---------------------
+
+IN DEVELOPMENT: Do not use.
+Remaining work:
+1. Indefinite duration Versionbit 27 tests based on higher activation thresholds.
+2. Larger CompactBlock support (larger indices). Adjusting bucket checking sizes.
+3. Benchmark tests.
+
+Bitcoin Core++ is a long-term patch designed to remove block size limits from the consensus layer in the least divisive way possible.
+Bitcoin Core++ is an exact copy of Bitcoin Core without any branding changes and the absolute minimal functional changes to remove
+block size and sig op limits from the consensus layer after a formal more restrictive BIP8 versionbits activation.
+Changes:
+1. User-Agent is changed to Satoshi++.
+2. Bit 27 in versionbits signals the support of the hardfork. This is the most likely bit to never conflict with any other BIP softfork activation signal.
+3. If BIP++1 is activated, versionbit 27 will always be considered the hardfork bit henceforth. There should only be consensus forming around one hardfork at any time.
+The rest of the bits will remain softfork signalling defined by BIP8.
+Once 99% of the last 2016 blocks signal support then size constraints no longer immediately.
+
+Every major release of Bitcoin Core will have BIP++1 changes rebased here and re-released with the exact same version tag.
+
+Bitcoin Core++ changes are referred to as BIP++1 and has no associated BIP.
+Bitcoin Core++ does not accept any other BIP++'s. Only PR's related to changes in BIP++1 will be considered.
+If BIP++1 gets activated this project/patch will end.
+For anything else please follow formal contribution processes at https://github.com/bitcoin/bitcoin.
+
+Why Bitcoin Core++?
+---------------------
+Hardforks are designed to be very difficult to implement and contentious by design. Due to this https://github.com/bitcoin/bitcoin will never
+merge in an intentional non bug-fix hardfork into its staging branch, even if it denies the existance that technology exponentially gets faster over time
+and a fixed block size limit rule inevitably slowly becomes mores outdated regardless of Lightning networks adoption rate.
+This patch provides a mechanism to signal support for removing, or supporting an increase in the block size rule, after which a formal BIP can be prepared when
+activation appears to be gaining significant support. This client will always support whatever size limits adjustments that a formal BIP proposes upto a 1GB pre-weighted limit.
+The inevitablity of increasing economic support for larger blocks will lead to another blocksize war. This repository is here to try prevent the creation of another fractured chain.
+
+Isn't unlimited block/sigop size dangerous?
+---------------------
+Yes it is, but its important to ephasise this is a long-term signalling patch and designed to follow the 4MB weighted network economic majority network as much as technically possible
+and still provide the latest Bitcoin Core improvements that thousands have contributed to and reviewed.
+The removal of checking block size/op limits in code is so support of this change is taken seriously if activation gets close.
+This allows Bitcoin Core clients to automatically notice and warn about an activated rule at 90% without forking the network until the much more difficult 99% threshold is reached.
+A proper BIP should be proposed that operates concurrently to signal the new upper limit or algorithm to use.
+
+Are the changes safe?
+---------------------
+This patch is one small commit that can easily be compared.
+
+What are the hardware requirements?
+---------------------
+To keep the patch minimal, non consensus code buffer sizes have already increased.
+Certain file IO buffer sizes in Bitcoin Core++ automatically become adjusted to 1GB even without activation.
+Therefore a machine with atleast 16GB of RAM should be used which is becoming much more common.
+
+--End of readme Bitcoin Core++ adjustment--
+
 Bitcoin Core integration/staging tree
 =====================================
 

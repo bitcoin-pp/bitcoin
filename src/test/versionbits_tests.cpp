@@ -37,10 +37,11 @@ public:
     int64_t EndTime(const Consensus::Params& params) const override { return TestTime(20000); }
     int Period(const Consensus::Params& params) const override { return 1000; }
     int Threshold(const Consensus::Params& params) const override { return 900; }
+    int HardForkThreshold(const Consensus::Params& params) const override { return 990; }
     bool Condition(const CBlockIndex* pindex, const Consensus::Params& params) const override { return (pindex->nVersion & 0x100); }
 
-    ThresholdState GetStateFor(const CBlockIndex* pindexPrev) const { return AbstractThresholdConditionChecker::GetStateFor(pindexPrev, paramsDummy, cache); }
-    int GetStateSinceHeightFor(const CBlockIndex* pindexPrev) const { return AbstractThresholdConditionChecker::GetStateSinceHeightFor(pindexPrev, paramsDummy, cache); }
+    ThresholdState GetStateFor(const CBlockIndex* pindexPrev) const { return AbstractThresholdConditionChecker::GetStateFor(pindexPrev, paramsDummy, cache, false); }
+    int GetStateSinceHeightFor(const CBlockIndex* pindexPrev) const { return AbstractThresholdConditionChecker::GetStateSinceHeightFor(pindexPrev, paramsDummy, cache, false); }
 };
 
 class TestDelayedActivationConditionChecker : public TestConditionChecker
