@@ -1,4 +1,4 @@
-Bitcoin Core integration/staging tree
+Bitcoin Core++ integration/staging tree
 =====================================
 
 What is Bitcoin Core++?
@@ -6,8 +6,9 @@ What is Bitcoin Core++?
 
 IN DEVELOPMENT: Do not use.
 Remaining work:
-1. Extending compact blocks for uint32 index support.
-2. versionbit tests for bit 27.
+1. Indefinite duration Versionbit 27 tests based on higher activation thresholds.
+2. Larger CompactBlock support (larger indices). Adjusting bucket checking sizes.
+3. Benchmark tests.
 
 Bitcoin Core++ is a long-term patch designed to remove block size limits from the consensus layer in the least divisive way possible.
 Bitcoin Core++ is an exact copy of Bitcoin Core without any branding changes and the absolute minimal functional changes to remove
@@ -38,7 +39,7 @@ The inevitablity of increasing economic support for larger blocks will lead to a
 Isn't unlimited block/sigop size dangerous?
 ---------------------
 Yes it is, but its important to ephasise this is a long-term signalling patch and designed to follow the 4MB weighted network economic majority network as much as technically possible
-and still provide the latest Bitcoin Core improvements that thousands have contributed to.
+and still provide the latest Bitcoin Core improvements that thousands have contributed to and reviewed.
 The removal of checking block size/op limits in code is so support of this change is taken seriously if activation gets close.
 This allows Bitcoin Core clients to automatically notice and warn about an activated rule at 90% without forking the network until the much more difficult 99% threshold is reached.
 A proper BIP should be proposed that operates concurrently to signal the new upper limit or algorithm to use.
@@ -49,11 +50,14 @@ This patch is one small commit that can easily be compared.
 
 What are the hardware requirements?
 ---------------------
-Certain buffer sizes in Bitcoin Core++ automatically become adjusted to 1GB even without activation.
+To keep the patch minimal, non consensus code buffer sizes have already increased.
+Certain file IO buffer sizes in Bitcoin Core++ automatically become adjusted to 1GB even without activation.
 Therefore a machine with atleast 16GB of RAM should be used which is becoming much more common.
-If you are a miner that would like to support larger blocks, but don't want your consensus code or node requirements changed for the time being feel free to run the minimal branch (TODO) which only contains the versionbit signalling.
 
 --End of readme Bitcoin Core++ adjustment--
+
+Bitcoin Core integration/staging tree
+=====================================
 
 https://bitcoincore.org
 
