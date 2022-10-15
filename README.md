@@ -18,7 +18,7 @@ Changes:
 2. Bit 27 in versionbits signals the support of the hardfork. This is the most likely bit to never conflict with any other BIP softfork activation signal.
 3. If BIP++1 is activated, versionbit 27 will always be considered the hardfork bit henceforth. There should only be consensus forming around one hardfork at any time.
 The rest of the bits will remain softfork signalling defined by BIP8.
-Once 99% of the last 2016 blocks signal support then size constraints no longer apply after the next immediate difficulty retarget period.
+Once 99% of the last 2016 blocks signal support then size constraints no longer immediately.
 
 Every major release of Bitcoin Core will have BIP++1 changes rebased here and re-released with the exact same version tag.
 
